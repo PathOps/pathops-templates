@@ -1,0 +1,5 @@
+id: react-nginx
+name: React + NGINX
+description: Simple React application served by nginx.
+
+inputs: []

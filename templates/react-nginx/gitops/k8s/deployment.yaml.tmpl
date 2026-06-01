@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .AppSlug }}
+  namespace: {{ .TenantSlug }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .AppSlug }}
+  template:
+    metadata:
+      labels:
+        app: {{ .AppSlug }}
+    spec:
+      containers:
+        - name: {{ .AppSlug }}
+          image: {{ .ImageRepository }}:{{ .ImageTag }}
+          ports:
+            - containerPort: 8080

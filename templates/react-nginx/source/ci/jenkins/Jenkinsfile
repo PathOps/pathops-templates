@@ -1,0 +1,35 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME = '{{ .AppSlug }}'
+        IMAGE_REPOSITORY = '{{ .ImageRepository }}'
+        DOCKERFILE = 'ci/docker/Dockerfile'
+    }
+
+    stages {
+        stage('Init') {
+            steps {
+                sh 'chmod +x ci/jenkins/scripts/*.sh'
+
+                script {
+                    env.IMAGE_TAG = env.GIT_COMMIT.take(8)
+                }
+
+                echo "Image tag: ${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('Build app') {
+            steps {
+                sh 'ci/jenkins/scripts/build.sh'
+            }
+        }
+
+        stage('Publish image') {
+            steps {
+                sh 'ci/jenkins/scripts/publish.sh'
+            }
+        }
+    }
+}
