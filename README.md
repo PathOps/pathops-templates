@@ -19,19 +19,28 @@ Tool-specific integration is supplied by generated CI/GitOps files and platform
 configuration, not by requiring application code to depend on GitLab, Jenkins,
 Harbor, Argo CD, Keycloak, or Loki APIs.
 
-A target template provides, directly or through resolved adapters:
+A target template scaffolds three user-owned repositories:
 
-- application source and unit/component tests;
-- application OCI image build definition;
-- integration/regression test OCI image build definition;
-- readiness/liveness behavior;
-- stdout/stderr logging;
-- a build/publish Jenkins pipeline;
-- a GitOps-update Jenkins pipeline;
-- Kubernetes desired-state templates for preflight/production and verification Jobs.
+- **source**: application source/tests and `.pathops/build/` (editable Tekton
+  build workflow, Dockerfile and any build-specific config/scripts);
+- **preflight GitOps**: preflight desired state plus `.pathops/` workflows and
+  environment tests owned by preflight;
+- **production GitOps**: production desired state plus `.pathops/` workflows
+  and smoke tests owned by production.
 
-The current template catalog is still evolving toward this contract; not every
-existing template implements every target element yet.
+`.pathops/` is a transparent convention, not a proprietary pipeline DSL. The
+generated Tekton/Kubernetes YAML, Dockerfiles and scripts are intentionally
+visible and editable. PathOps supplies the execution engines and initial wiring;
+the Application owns the generated workflows afterwards.
+
+The first product template is intentionally technology-agnostic and proves the
+container/GitOps contract with a minimal working application. Stack-specific
+templates (Go, Spring Boot, Node.js, React/NGINX, etc.) are conveniences layered
+on that contract, not the only technologies PathOps can support.
+
+The current template catalog predates this target and is still evolving toward
+it; existing templates are not yet evidence that the full contract is
+implemented.
 
 ## Goals
 
