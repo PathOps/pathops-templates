@@ -1,0 +1,11 @@
+# {{ app.name }}-gitops-production
+
+The production environment of `{{ app.name }}`: its desired state and the smoke
+checks that validate it. This repository is yours and may differ from
+preflight.
+
+```text
+kustomization.yaml, deployment.yaml, service.yaml   the desired state
+.pathops/deploy/                                    how it is deployed
+.pathops/smoke/                                     smoke checks, run against the deployed production
+```

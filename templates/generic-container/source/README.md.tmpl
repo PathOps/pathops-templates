@@ -1,0 +1,23 @@
+# {{ app.name }}
+
+A PathOps Application created from the `generic-container` Golden Path.
+
+This repository is yours: change anything, including `.pathops/`.
+
+```text
+app/              the application: a static page (replace it with your own)
+tests/            source/component tests (run without a deployment)
+.pathops/build/   how the application image is built (Dockerfile and build files)
+```
+
+The image is built with the repository root as context:
+
+```bash
+sh tests/check-content.sh
+docker build -f .pathops/build/Dockerfile -t {{ app.name }}:local .
+docker run --rm -p 8080:8080 {{ app.name }}:local   # http://localhost:8080
+```
+
+The deployed environments live in two other repositories, each with its own
+desired state and checks: `{{ app.name }}-gitops-preflight` and
+`{{ app.name }}-gitops-production`.

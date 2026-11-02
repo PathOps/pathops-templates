@@ -1,0 +1,16 @@
+# The generic-container Golden Path (Decision 0048). Format: README.md of this
+# catalog, "Template format".
+schemaVersion: 1
+id: generic-container
+name: Generic Container
+description: Technology-agnostic container Golden Path for the first durable create-app workflow.
+
+# No user inputs: the only value a file may use is app.name.
+inputs: []
+
+# The initial content of each generated repository: a directory of this
+# template.
+repositories:
+  source: source
+  preflight: gitops-preflight
+  production: gitops-production

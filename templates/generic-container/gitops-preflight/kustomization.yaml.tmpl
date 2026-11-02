@@ -1,0 +1,8 @@
+# The preflight desired state of {{ app.name }}. The deploy workflow sets the image
+# to the build's immutable revision; until then the image is the placeholder
+# {{ app.name }}.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml

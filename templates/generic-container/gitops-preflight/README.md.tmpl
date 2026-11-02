@@ -1,0 +1,11 @@
+# {{ app.name }}-gitops-preflight
+
+The preflight environment of `{{ app.name }}`: its desired state and the tests
+that validate it. This repository is yours and may differ from production (for
+example a database inside the cluster here and a managed one in production).
+
+```text
+kustomization.yaml, deployment.yaml, service.yaml   the desired state
+.pathops/deploy/                                    how it is deployed
+.pathops/tests/                                     environment tests, run against the deployed preflight
+```
