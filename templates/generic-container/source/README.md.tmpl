@@ -8,6 +8,7 @@ This repository is yours: change anything, including `.pathops/`.
 app/              the application: a static page (replace it with your own)
 tests/            source/component tests (run without a deployment)
 .pathops/build/   how the application image is built (Dockerfile and build files)
+.pathops/tekton/  the build-and-push Pipeline and its build-image Task (Tekton)
 ```
 
 The image is built with the repository root as context:
@@ -17,6 +18,10 @@ sh tests/check-content.sh
 docker build -f .pathops/build/Dockerfile -t {{ app.name }}:local .
 docker run --rm -p 8080:8080 {{ app.name }}:local   # http://localhost:8080
 ```
+
+Every push to `main` builds and pushes the image in the PathOps Cell: Tekton
+runs `.pathops/tekton/pipelines/build-and-push.yaml`, at the pushed commit,
+and tags the image with the commit's first 12 characters.
 
 The deployed environments live in two other repositories, each with its own
 desired state and checks: `{{ app.name }}-gitops-preflight` and

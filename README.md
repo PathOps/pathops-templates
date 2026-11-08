@@ -147,13 +147,17 @@ user on port 8080:
 
 | Repository | Content |
 |---|---|
-| `<app>` | `README.md`, `app/` (page, `healthz`), `tests/check-content.sh` (source test), `.pathops/build/` (`Dockerfile`, README), `.dockerignore` |
+| `<app>` | `README.md`, `app/` (page, `healthz`), `tests/check-content.sh` (source test), `.pathops/build/` (`Dockerfile`, README), `.pathops/tekton/` (`pipelines/build-and-push.yaml`, `tasks/build-image.yaml`), `.dockerignore` |
 | `<app>-gitops-preflight` | `kustomization.yaml`, `deployment.yaml`, `service.yaml`, `README.md`, `.pathops/deploy/`, `.pathops/tests/http-check.sh` |
 | `<app>-gitops-production` | the same desired-state files, `README.md`, `.pathops/deploy/`, `.pathops/smoke/http-check.sh` |
 
-The build workflow (Tekton), the deploy workflow and the image reference are
-added by Slices 37 and 39. Until then the desired state names the image
-placeholder `<app>`, and nothing builds or deploys.
+The build workflow is `.pathops/tekton/` of the source repository (PathOps
+Decision 0056): on every push to `main`, PathOps runs the `build-and-push`
+Pipeline, which Tekton Remote Resolution loads with its `build-image` Task from
+the source repository at the pushed commit. Every parameter comes from the
+PathOps trigger; the files name no Cell. The deploy workflow and the image
+reference are added later: until then the desired state names the image
+placeholder `<app>`, and nothing deploys.
 
 ## Reproducibility
 

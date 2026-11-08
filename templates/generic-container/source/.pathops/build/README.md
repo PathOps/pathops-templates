@@ -8,6 +8,8 @@ edit them freely.
   certificates, scripts) can live next to it in this directory. Never commit
   secrets or private keys here.
 
-PathOps runs the build in the Cell's Tekton from this directory. The build
-workflow files are added here by a later PathOps release; until then, nothing
-builds automatically.
+PathOps builds the image in the Cell's Tekton on every push to `main`, with
+the Pipeline and Task in `../tekton/` (also yours to edit): the exact pushed
+commit, rootless BuildKit, and a push to this Application's registry
+repository tagged with the commit's first 12 characters. An existing tag is
+never overwritten.

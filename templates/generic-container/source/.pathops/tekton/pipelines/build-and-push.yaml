@@ -1,0 +1,52 @@
+# The build of this repository (PathOps BUILD_AND_PUSH, Decision 0056).
+#
+# On every push to main, PathOps starts this Pipeline through the
+# Application's Tekton EventListener. Tekton Remote Resolution loads this file
+# and the Task below from this repository at the pushed commit, so the
+# definitions that run are always the ones of the commit being built. They
+# are ordinary files of this repository: edit them freely.
+#
+# Every parameter comes from the PathOps trigger. The Pipeline task named
+# build-image runs with the BUILD execution role, the Application's build
+# ServiceAccount and its read-only source deploy key (workspace
+# source-checkout); no other Pipeline task can use them.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: {name: build-and-push}
+spec:
+  params:
+    - {name: revision, type: string, description: the full commit SHA to build}
+    - {name: source-server-url, type: string, description: "the Cell Forgejo (Remote Resolution of the Task)"}
+    - {name: source-org, type: string, description: the repository owner}
+    - {name: source-repository, type: string, description: the repository name}
+    - {name: source-resolution-secret, type: string, description: "the Secret with the read token of Remote Resolution"}
+    - {name: source-ssh-url, type: string, description: the repository's SSH URL for the checkout}
+    - {name: image-repository, type: string, description: "<registry host>/apps/<application id>"}
+    - {name: dex-token-url, type: string, description: "the Cell Dex token endpoint (registry token exchange)"}
+  workspaces:
+    - {name: source-checkout, description: "the read-only deploy key (ssh-privatekey) and known_hosts"}
+  results:
+    - {name: sourceCommit, value: $(tasks.build-image.results.sourceCommit)}
+    - {name: imageRepository, value: $(tasks.build-image.results.imageRepository)}
+    - {name: imageRevision, value: $(tasks.build-image.results.imageRevision)}
+    - {name: imageDigest, value: $(tasks.build-image.results.imageDigest)}
+  tasks:
+    - name: build-image
+      taskRef:
+        resolver: git
+        params:
+          - {name: scmType, value: gitea}
+          - {name: serverURL, value: $(params.source-server-url)}
+          - {name: org, value: $(params.source-org)}
+          - {name: repo, value: $(params.source-repository)}
+          - {name: revision, value: $(params.revision)}
+          - {name: pathInRepo, value: .pathops/tekton/tasks/build-image.yaml}
+          - {name: token, value: $(params.source-resolution-secret)}
+          - {name: tokenKey, value: token}
+      params:
+        - {name: revision, value: $(params.revision)}
+        - {name: source-ssh-url, value: $(params.source-ssh-url)}
+        - {name: image-repository, value: $(params.image-repository)}
+        - {name: dex-token-url, value: $(params.dex-token-url)}
+      workspaces:
+        - {name: source-checkout, workspace: source-checkout}

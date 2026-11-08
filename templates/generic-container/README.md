@@ -13,7 +13,9 @@ repositories:
 <app>-gitops-production
 ```
 
-The source repository owns `.pathops/build/`; preflight owns its GitOps desired
+The source repository owns `.pathops/build/` and `.pathops/tekton/` (the
+build-and-push Pipeline and its build-image Task, run by PathOps on every push
+to `main`); preflight owns its GitOps desired
 state plus `.pathops/deploy/` and `.pathops/tests/`; production owns its desired
 state plus `.pathops/deploy/` and `.pathops/smoke/`.
 
