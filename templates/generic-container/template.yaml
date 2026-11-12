@@ -14,3 +14,10 @@ repositories:
   source: source
   preflight: gitops-preflight
   production: gitops-production
+
+# What the Application is built with, as plain labels the PathOps UI shows
+# (Decision 0060); PathOps never infers it from the repository's content.
+technology:
+  runtime: container
+  language: any
+  build: Dockerfile

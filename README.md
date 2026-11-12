@@ -105,7 +105,17 @@ repositories:                # the directory of each repository's content
   source: source
   preflight: gitops-preflight
   production: gitops-production
+technology:                  # optional: plain labels the UI shows (Decision 0060)
+  runtime: container         # each optional, at most 64 characters
+  language: any
+  framework: ...
+  build: Dockerfile
 ```
+
+`technology` is declared, never inferred from a repository's content; the
+Tenant Control Plane records it with the template's resolution. A Tenant
+Control Plane older than this field (before 42be29a53148) rejects a
+`template.yaml` that has it.
 
 Rendering:
 
