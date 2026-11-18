@@ -8,8 +8,9 @@
 #
 # Every parameter comes from the PathOps trigger. The Pipeline task named
 # build-image runs with the BUILD execution role, the Application's build
-# ServiceAccount and its read-only source deploy key (workspace
-# source-checkout); no other Pipeline task can use them.
+# ServiceAccount, its read-only source deploy key (workspace source-checkout)
+# and this build's short-lived registry credential (workspace
+# registry-credential); no other Pipeline task can use them.
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata: {name: build-and-push}
@@ -22,9 +23,9 @@ spec:
     - {name: source-resolution-secret, type: string, description: "the Secret with the read token of Remote Resolution"}
     - {name: source-ssh-url, type: string, description: the repository's SSH URL for the checkout}
     - {name: image-repository, type: string, description: "<registry host>/apps/<application id>"}
-    - {name: dex-token-url, type: string, description: "the Cell Dex token endpoint (registry token exchange)"}
   workspaces:
     - {name: source-checkout, description: "the read-only deploy key (ssh-privatekey) and known_hosts"}
+    - {name: registry-credential, description: "this build's short-lived registry token (token)"}
   results:
     - {name: sourceCommit, value: $(tasks.build-image.results.sourceCommit)}
     - {name: imageRepository, value: $(tasks.build-image.results.imageRepository)}
@@ -47,6 +48,6 @@ spec:
         - {name: revision, value: $(params.revision)}
         - {name: source-ssh-url, value: $(params.source-ssh-url)}
         - {name: image-repository, value: $(params.image-repository)}
-        - {name: dex-token-url, value: $(params.dex-token-url)}
       workspaces:
         - {name: source-checkout, workspace: source-checkout}
+        - {name: registry-credential, workspace: registry-credential}

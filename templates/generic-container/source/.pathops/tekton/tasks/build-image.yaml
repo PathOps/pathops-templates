@@ -6,12 +6,13 @@
 #             HEAD must be that commit
 #   build     rootless BuildKit (BUILD execution role), the image labeled
 #             with the commit; an OCI archive, no registry access
-#   push      a short-lived registry token: the projected ServiceAccount
-#             token exchanged at the Cell's Dex for a token of exactly this
-#             Application's repository (no stored registry credential). The
-#             tag is the first 12 characters of the commit and is never
-#             overwritten: absent -> pushed; built from this commit ->
-#             adopted; anything else -> the build fails
+#   push      with this build's registry credential (workspace
+#             registry-credential, key token): a short-lived token of exactly
+#             this Application's repository that PathOps issues for this build
+#             only (no stored registry credential). The tag is the first 12
+#             characters of the commit and is never overwritten: absent ->
+#             pushed; built from this commit -> adopted; anything else -> the
+#             build fails
 #
 # Results (Decision 0053): sourceCommit, imageRepository, imageRevision,
 # imageDigest.
@@ -23,10 +24,10 @@ spec:
     - {name: revision, type: string, description: the full commit SHA to build}
     - {name: source-ssh-url, type: string, description: the repository's SSH URL}
     - {name: image-repository, type: string, description: "<registry host>/apps/<application id>"}
-    - {name: dex-token-url, type: string, description: the Cell Dex token endpoint}
     - {name: dockerfile, type: string, default: .pathops/build/Dockerfile, description: "the Dockerfile; the context is the repository root"}
   workspaces:
     - {name: source-checkout, readOnly: true, mountPath: /pathops/source-checkout}
+    - {name: registry-credential, readOnly: true, mountPath: /pathops/registry-credential}
   results:
     - {name: sourceCommit, description: the built commit}
     - {name: imageRepository, description: the image repository}
@@ -40,11 +41,6 @@ spec:
     - {name: tmp-push, emptyDir: {}}
     - {name: subid, configMap: {name: userns-subid}}
     - {name: cell-ca, configMap: {name: cell-ca}}
-    # The Cell STS audience (a PathOps platform constant); at most 15 minutes.
-    - name: sa-token
-      projected:
-        sources:
-          - serviceAccountToken: {audience: "https://dex.identity.svc.cluster.local:5556", expirationSeconds: 600, path: token}
   steps:
     - name: checkout
       image: docker.io/alpine/git:2.49.1@sha256:c0280cf9572316299b08544065d3bf35db65043d5e3963982ec50647d2746e26
@@ -123,24 +119,19 @@ spec:
           --output type=oci,dest=/out/image.tar
     - name: push
       image: quay.io/skopeo/stable:v1.20.0@sha256:47853bb9fb24202af9110531ebd6e43c5f97701254ca290596640290d17942f4
-      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, seccompProfile: {type: RuntimeDefault}}
+      # group 65532 = the BUILD Pod fsGroup, so the registry credential is readable
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 65532, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, seccompProfile: {type: RuntimeDefault}}
       env: [{name: HOME, value: /tmp}]
       volumeMounts:
         - {name: out, mountPath: /out, readOnly: true}
         - {name: cell-ca, mountPath: /etc/pathops/cell-ca, readOnly: true}
-        - {name: sa-token, mountPath: /var/run/secrets/pathops, readOnly: true}
         - {name: tmp-push, mountPath: /tmp}
       script: |
         #!/bin/sh
         set -eu
-        # RFC 8693 at the Cell's Dex: the projected ServiceAccount token for a
-        # registry token of this Application's repository only (<= 5 minutes).
-        TOK=$(curl -sS --fail-with-body --cacert /etc/pathops/cell-ca/ca.crt \
-          -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange -d client_id=zot -d connector_id=k8s-cell \
-          -d subject_token_type=urn:ietf:params:oauth:token-type:id_token \
-          -d requested_token_type=urn:pathops:params:oauth:token-type:registry \
-          --data-urlencode subject_token@/var/run/secrets/pathops/token "$(params.dex-token-url)" \
-          | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+        # This build's registry credential: a short-lived token of this
+        # Application's repository only (pull, push), issued by PathOps.
+        TOK=$(cat /pathops/registry-credential/token)
         [ -n "$TOK" ] || { echo "no registry token"; exit 1; }
         commit=$(cat "$(results.sourceCommit.path)"); rev=$(cat "$(results.imageRevision.path)")
         printf '%s' "$rev" | grep -Eqx '[0-9a-f]{12}' || { echo "not a 12-character image revision: $rev"; exit 1; }
