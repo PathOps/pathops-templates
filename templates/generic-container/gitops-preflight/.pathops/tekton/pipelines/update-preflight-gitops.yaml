@@ -1,0 +1,59 @@
+# The Preflight GitOps update of this repository (PathOps
+# UPDATE_PREFLIGHT_GITOPS, Decision 0064).
+#
+# After a successful build, PathOps resolves the current exact commit of this
+# repository and starts this Pipeline through the Application's Preflight
+# update EventListener. Tekton Remote Resolution loads this file and the Task
+# below from this repository at that commit, so the definitions that run are
+# always the ones of the commit being updated. They are ordinary files of this
+# repository: edit them freely.
+#
+# Every parameter comes from the PathOps trigger. The Pipeline task named
+# update-preflight-gitops runs as the Application's GitOps update
+# ServiceAccount with this repository's write deploy key (workspace
+# gitops-writer); no other Pipeline task can use it. It has no Kubernetes
+# deployment authority: Flux deploys the commit it pushes.
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata: {name: update-preflight-gitops}
+spec:
+  params:
+    - {name: gitops-revision, type: string, description: "the full commit SHA of this repository to update (the definitions' too)"}
+    - {name: gitops-server-url, type: string, description: "the Cell Forgejo (Remote Resolution of the Task)"}
+    - {name: gitops-org, type: string, description: the repository owner}
+    - {name: gitops-repository, type: string, description: the repository name}
+    - {name: gitops-resolution-secret, type: string, description: "the Secret with the read token of Remote Resolution"}
+    - {name: gitops-ssh-url, type: string, description: "the repository's SSH URL (clone and push)"}
+    - {name: source-revision, type: string, description: the source commit the image was built from}
+    - {name: image-repository, type: string, description: "<registry host>/apps/<application id>"}
+    - {name: image-revision, type: string, description: the image tag (the first 12 characters of source-revision)}
+    - {name: image-digest, type: string, description: "the image's OCI digest (sha256:...)"}
+    - {name: deployment-id, type: string, description: the PathOps Deployment this update belongs to}
+  workspaces:
+    - {name: gitops-writer, description: "this repository's write deploy key (ssh-privatekey) and known_hosts"}
+  results:
+    - {name: gitopsCommit, value: $(tasks.update-preflight-gitops.results.gitopsCommit)}
+    - {name: image, value: $(tasks.update-preflight-gitops.results.image)}
+  tasks:
+    - name: update-preflight-gitops
+      taskRef:
+        resolver: git
+        params:
+          - {name: scmType, value: gitea}
+          - {name: serverURL, value: $(params.gitops-server-url)}
+          - {name: org, value: $(params.gitops-org)}
+          - {name: repo, value: $(params.gitops-repository)}
+          - {name: revision, value: $(params.gitops-revision)}
+          - {name: pathInRepo, value: .pathops/tekton/tasks/update-preflight-gitops.yaml}
+          - {name: token, value: $(params.gitops-resolution-secret)}
+          - {name: tokenKey, value: token}
+      params:
+        - {name: gitops-revision, value: $(params.gitops-revision)}
+        - {name: gitops-ssh-url, value: $(params.gitops-ssh-url)}
+        - {name: source-revision, value: $(params.source-revision)}
+        - {name: image-repository, value: $(params.image-repository)}
+        - {name: image-revision, value: $(params.image-revision)}
+        - {name: image-digest, value: $(params.image-digest)}
+        - {name: deployment-id, value: $(params.deployment-id)}
+      workspaces:
+        - {name: gitops-writer, workspace: gitops-writer}

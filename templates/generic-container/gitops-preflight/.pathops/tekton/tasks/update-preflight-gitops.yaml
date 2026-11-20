@@ -1,0 +1,104 @@
+# update-preflight-gitops: set this repository's preflight desired state to a
+# build's exact image and push one commit (PathOps UPDATE_PREFLIGHT_GITOPS,
+# Decision 0064). Edit freely: it is yours.
+#
+#   checkout  main over SSH with this repository's write deploy key; main must
+#             still be the exact commit PathOps resolved (gitops-revision): an
+#             update is never applied over another revision
+#   update    kustomize: deployment.yaml joins the resources (the first time)
+#             and the image app is set, in one operation, to
+#             <repository>:<revision>@<digest>; the rendered desired state must
+#             run exactly that image
+#   push      one commit on main (never forced); nothing to commit when main
+#             already has that desired state
+#
+# Results: gitopsCommit (the full SHA of main after the update, the commit
+# Flux must apply) and image (the reference written).
+apiVersion: tekton.dev/v1
+kind: Task
+metadata: {name: update-preflight-gitops}
+spec:
+  params:
+    - {name: gitops-revision, type: string, description: the full commit SHA of main to update}
+    - {name: gitops-ssh-url, type: string, description: "the repository's SSH URL"}
+    - {name: source-revision, type: string, description: the source commit the image was built from}
+    - {name: image-repository, type: string, description: "<registry host>/apps/<application id>"}
+    - {name: image-revision, type: string, description: the image tag (the first 12 characters of source-revision)}
+    - {name: image-digest, type: string, description: "the image's OCI digest (sha256:...)"}
+    - {name: deployment-id, type: string, description: the PathOps Deployment this update belongs to}
+  workspaces:
+    - {name: gitops-writer, readOnly: true, mountPath: /pathops/gitops-writer}
+  results:
+    - {name: gitopsCommit, description: the full SHA of main after the update}
+    - {name: image, description: the image reference written to the desired state}
+  volumes:
+    - {name: work, emptyDir: {}}
+  steps:
+    - name: checkout
+      image: docker.io/alpine/git:2.49.1@sha256:c0280cf9572316299b08544065d3bf35db65043d5e3963982ec50647d2746e26
+      # group 65532 = the Pod fsGroup, so the deploy key is readable
+      securityContext: {runAsNonRoot: true, runAsUser: 65534, runAsGroup: 65532, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, seccompProfile: {type: RuntimeDefault}}
+      env: [{name: HOME, value: /tmp}]
+      volumeMounts: [{name: work, mountPath: /work}]
+      script: |
+        #!/bin/sh
+        set -eu
+        rev="$(params.gitops-revision)"
+        printf '%s' "$rev" | grep -Eqx '[0-9a-f]{40}' || { echo "not a full commit SHA: $rev"; exit 1; }
+        install -m 0600 /pathops/gitops-writer/ssh-privatekey /work/git-identity
+        export GIT_SSH_COMMAND="ssh -i /work/git-identity -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/pathops/gitops-writer/known_hosts"
+        git clone --quiet --branch main --single-branch "$(params.gitops-ssh-url)" /work/repo
+        head=$(git -C /work/repo rev-parse HEAD)
+        [ "$head" = "$rev" ] || { echo "main is at $head, not $rev: the repository changed after PathOps resolved it; not updated"; exit 1; }
+        echo "gitops $rev"
+    - name: update
+      image: registry.k8s.io/kustomize/kustomize:v5.7.1@sha256:937e7832dc0b09288b1398399dadb97382a27bbc35bee8fdcac47c7de4fff14d
+      securityContext: {runAsNonRoot: true, runAsUser: 65534, runAsGroup: 65532, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, seccompProfile: {type: RuntimeDefault}}
+      env: [{name: HOME, value: /tmp}]
+      volumeMounts: [{name: work, mountPath: /work}]
+      script: |
+        #!/bin/sh
+        set -eu
+        src="$(params.source-revision)"; tag="$(params.image-revision)"; digest="$(params.image-digest)"
+        printf '%s' "$src" | grep -Eqx '[0-9a-f]{40}' || { echo "not a full source commit: $src"; exit 1; }
+        [ "$tag" = "$(printf '%.12s' "$src")" ] || { echo "image revision $tag is not the source commit's first 12 characters"; exit 1; }
+        printf '%s' "$digest" | grep -Eqx 'sha256:[0-9a-f]{64}' || { echo "not an OCI digest: $digest"; exit 1; }
+        ref="$(params.image-repository):$tag@$digest"
+        cd /work/repo
+        grep -Eq '^[[:space:]]*-[[:space:]]*deployment\.yaml[[:space:]]*$' kustomization.yaml || /app/kustomize edit add resource deployment.yaml
+        # One operation: repository, tag and digest together.
+        /app/kustomize edit set image "app=$ref"
+        /app/kustomize build . > /work/rendered.yaml
+        images=$(sed -n 's/^[[:space:]-]*image:[[:space:]]*//p' /work/rendered.yaml | sort -u)
+        [ "$images" = "$ref" ] || { echo "the rendered desired state runs [$images], not exactly $ref"; exit 1; }
+        printf '%s' "$ref" > "$(results.image.path)"
+        echo "image $ref"
+    - name: push
+      image: docker.io/alpine/git:2.49.1@sha256:c0280cf9572316299b08544065d3bf35db65043d5e3963982ec50647d2746e26
+      securityContext: {runAsNonRoot: true, runAsUser: 65534, runAsGroup: 65532, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, seccompProfile: {type: RuntimeDefault}}
+      env: [{name: HOME, value: /tmp}]
+      volumeMounts: [{name: work, mountPath: /work}]
+      script: |
+        #!/bin/sh
+        set -eu
+        export GIT_SSH_COMMAND="ssh -i /work/git-identity -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/pathops/gitops-writer/known_hosts"
+        cd /work/repo
+        ref=$(cat "$(results.image.path)")
+        git add -A
+        if git diff --cached --quiet; then
+          echo "main already deploys $ref: nothing to commit"
+        else
+          git -c user.name=PathOps -c user.email=pathops@pathops.invalid commit --quiet -F - <<MSG
+        Deploy $(params.image-revision) to preflight
+
+        PathOps-Deployment: $(params.deployment-id)
+        PathOps-Source-Revision: $(params.source-revision)
+        PathOps-Image: $ref
+        MSG
+          git push --quiet origin HEAD:refs/heads/main
+        fi
+        commit=$(git rev-parse HEAD)
+        remote=$(git ls-remote origin refs/heads/main | cut -f1)
+        [ "$remote" = "$commit" ] || { echo "main is at $remote after the push, not $commit"; exit 1; }
+        printf '%s' "$commit" > "$(results.gitopsCommit.path)"
+        echo "gitops commit $commit"

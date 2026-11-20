@@ -6,6 +6,8 @@ example a database inside the cluster here and a managed one in production).
 
 ```text
 kustomization.yaml, deployment.yaml, service.yaml   the desired state
+.pathops/tekton/                                    the update-preflight-gitops Pipeline and Task PathOps
+                                                    runs after each build: they set the build's exact image
 .pathops/deploy/                                    how it is deployed
 .pathops/tests/                                     environment tests, run against the deployed preflight
 ```
