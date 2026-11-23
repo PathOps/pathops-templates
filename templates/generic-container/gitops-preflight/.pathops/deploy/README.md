@@ -13,7 +13,14 @@ push to the source repository
      <app>-preflight, at exactly that commit
 ```
 
-Until the first build only `service.yaml` is deployed: `deployment.yaml` is
+`ingress.yaml` exposes the Application at its default Route's Preflight
+hostname (Decision 0067), e.g. `<route>-preflight-<cell>.<domain>`: PathOps
+reserved it for this Application and the Cell admits an Ingress here only
+with hostnames of this Application's Routes for Preflight. More public names
+are more Routes (`pathops -a <app> create route <name>`); a Service of this
+namespace (a database, say) needs none: Kubernetes Service DNS reaches it.
+
+Until the first build only `service.yaml` and `ingress.yaml` are deployed: `deployment.yaml` is
 added to `kustomization.yaml` by the first update, together with the build's
 exact image, so the environment never runs a placeholder image. The
 Deployment runs as the ServiceAccount `<app>-runtime`, which PathOps

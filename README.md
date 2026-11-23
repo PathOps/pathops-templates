@@ -123,7 +123,12 @@ Rendering:
   the same relative path, as the first commit of `main`;
 - a file ending in `.tmpl` is rendered and loses the suffix: every
   `{{ name }}` must name a known value and is replaced by it; any other `{{`
-  is an error. The only value today is `app.name` (the Application name).
+  is an error. The values are `app.name` (the Application name) and the
+  Application's default Route hostnames (PathOps Decision 0067)
+  `route.preflight.host` and `route.production.host`, e.g.
+  `api-shop-preflight-testing.demo.pathops.io`; a Tenant Control Plane before
+  Routes (before Decision 0067) knows only `app.name` and refuses a template
+  that uses them.
   There are no functions, conditions, loops, includes or inheritance;
 - every other file is copied byte for byte (a plain file may contain `{{`);
 - failures stop the provisioning: an unknown value, a malformed placeholder,
@@ -131,7 +136,8 @@ Rendering:
   a `.git` path, more than 512 files or 4 MiB;
 - the generated files are mode 100644 (run scripts with `sh <script>`).
 
-The same catalog commit and Application name always produce the same bytes.
+The same catalog commit, Application name and default Route always produce
+the same bytes.
 
 ## Resolution
 
@@ -158,7 +164,7 @@ user on port 8080:
 | Repository | Content |
 |---|---|
 | `<app>` | `README.md`, `app/` (page, `healthz`), `tests/check-content.sh` (source test), `.pathops/build/` (`Dockerfile`, README), `.pathops/tekton/` (`pipelines/build-and-push.yaml`, `tasks/build-image.yaml`), `.dockerignore` |
-| `<app>-gitops-preflight` | `kustomization.yaml`, `deployment.yaml`, `service.yaml`, `README.md`, `.pathops/deploy/`, `.pathops/tests/http-check.sh` |
+| `<app>-gitops-preflight` | `kustomization.yaml`, `deployment.yaml`, `service.yaml`, `ingress.yaml` (the default Route, Decision 0067), `README.md`, `.pathops/deploy/`, `.pathops/tests/http-check.sh` |
 | `<app>-gitops-production` | the same desired-state files, `README.md`, `.pathops/deploy/`, `.pathops/smoke/http-check.sh` |
 
 The build workflow is `.pathops/tekton/` of the source repository (PathOps

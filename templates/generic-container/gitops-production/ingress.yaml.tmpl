@@ -1,0 +1,25 @@
+# The production exposure of {{ app.name }}: its default Route's canonical production
+# hostname (PathOps Decision 0067), which PathOps reserved for this
+# Application and wrote here. The Cell admits only hostnames of this
+# Application's Routes for this Environment: reserve another one with
+# "pathops -a {{ app.name }} create route <name>" and add a rule for its
+# hostname. TLS is the Cell's (the default certificate of the traefik class).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ app.name }}
+  labels: {app.kubernetes.io/name: {{ app.name }}}
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [{{ route.production.host }}]
+  rules:
+    - host: {{ route.production.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ app.name }}
+                port: {name: http}
