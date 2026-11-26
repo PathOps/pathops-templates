@@ -167,6 +167,12 @@ user on port 8080:
 | `<app>-gitops-preflight` | `kustomization.yaml`, `deployment.yaml`, `service.yaml`, `ingress.yaml` (the default Route, Decision 0067), `README.md`, `.pathops/deploy/`, `.pathops/tests/http-check.sh` |
 | `<app>-gitops-production` | the same desired-state files, `README.md`, `.pathops/deploy/`, `.pathops/smoke/http-check.sh` |
 
+`tests/update-preflight-gitops.sh` (`make test`; docker, no Cell) runs the
+Preflight update Task's update step in its own pinned image over generated
+repositories: one image; more images and workloads of the user's; several
+workloads of the image `app`; the image `app` not updated, absent, or only
+the build's reference written by hand; a rendering error; bad parameters.
+
 The build workflow is `.pathops/tekton/` of the source repository (PathOps
 Decision 0056): on every push to `main`, PathOps runs the `build-and-push`
 Pipeline, which Tekton Remote Resolution loads with its `build-image` Task from

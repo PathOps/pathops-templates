@@ -25,7 +25,9 @@ Preflight starts Flux-safe: its Kustomization deploys only the Service until
 the first update adds `deployment.yaml` with the build's exact
 `<repository>:<revision>@<digest>` (the Deployment's image is the logical name
 `app` until then and never runs). The Deployment runs as `<app>-runtime`, the
-Preflight runtime identity PathOps provisions.
+Preflight runtime identity PathOps provisions. The update sets only the image
+`app`: other workloads and images of the repository are the user's and stay
+as they are (`gitops-preflight/.pathops/deploy/README.md`).
 
 Generated files are ordinary editable Docker/Tekton/Kubernetes/script files.
 This template remains the generic escape hatch when no stack-specific PathOps

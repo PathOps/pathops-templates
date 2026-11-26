@@ -29,3 +29,16 @@ provisions and authorizes to pull exactly this Application's image.
 The update Task owns how the desired state changes (here `kustomize edit set
 image`); PathOps only gives it the build's image identity and a write deploy
 key of this repository, and waits for Flux to apply the commit it returns.
+
+The desired state may hold more workloads and images than the Application's:
+another Deployment, Service or Ingress (for another Route), with images of
+your own. The update sets only the image `app` (the `images` entry of
+`kustomization.yaml`): every container whose image is `app`, in any workload,
+runs the build's exact image afterwards, and there must be one at least; any
+other image and file stays as you wrote it. The update checks it by rendering
+the desired state; it is a consistency check, not a security boundary (the
+Cell's admission protects the runtime). Flux applies the whole repository and
+the Deployment waits for all of it: a workload of yours that does not become
+ready fails the next Deployment too. A push of yours to this repository is
+applied by Flux on its own (it polls `main`), with no Delivery or Deployment
+in PathOps.

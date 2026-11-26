@@ -7,8 +7,10 @@
 #             update is never applied over another revision
 #   update    kustomize: deployment.yaml joins the resources (the first time)
 #             and the image app is set, in one operation, to
-#             <repository>:<revision>@<digest>; the rendered desired state must
-#             run exactly that image
+#             <repository>:<revision>@<digest>; in the rendered desired state
+#             every container of the image app (one at least, any workload)
+#             must run exactly that image, and nothing else may change: other
+#             images and workloads of this repository are yours, kept as they are
 #   push      one commit on main (never forced); nothing to commit when main
 #             already has that desired state
 #
@@ -69,8 +71,22 @@ spec:
         # One operation: repository, tag and digest together.
         /app/kustomize edit set image "app=$ref"
         /app/kustomize build . > /work/rendered.yaml
-        images=$(sed -n 's/^[[:space:]-]*image:[[:space:]]*//p' /work/rendered.yaml | sort -u)
-        [ "$images" = "$ref" ] || { echo "the rendered desired state runs [$images], not exactly $ref"; exit 1; }
+        # The managed containers are the image app's (the images entry this
+        # step sets); other images are the repository's own and are left as
+        # they are. Render once more with a marker in place of the build's
+        # image: the containers that run the marker are the managed ones.
+        # There must be one at least, and the desired state must be exactly
+        # that rendering with the build's image for the marker.
+        marker="pathops-managed-image:marker@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        rm -rf /work/marked && cp -R /work/repo /work/marked && cd /work/marked
+        /app/kustomize edit set image "app=$marker"
+        /app/kustomize build . > /work/marked.yaml
+        cd /work/repo
+        managed=$(sed -n 's/^[[:space:]-]*image:[[:space:]]*//p' /work/marked.yaml | grep -cxF "$marker" || true)
+        [ "$managed" -gt 0 ] || { echo "no container of the rendered desired state runs the image app (set by kustomization.yaml images): it would not run $ref"; exit 1; }
+        sed "s#$marker#$ref#g" /work/marked.yaml | cmp -s - /work/rendered.yaml \
+          || { echo "the rendered desired state does not run exactly $ref in the $managed container(s) of the image app"; exit 1; }
+        echo "$managed container(s) of the image app run $ref"
         printf '%s' "$ref" > "$(results.image.path)"
         echo "image $ref"
     - name: push
